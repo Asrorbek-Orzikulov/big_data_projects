@@ -80,14 +80,14 @@ def apply_map(filename, map_func, column_names):
     -------
     list of tuples
         Contains tuples returned by each call of `map_func`. If the
-        map result was (None, None), it is not included in the list.
+        map result contains None, it is not included in the list.
     """
     lines = read_csv(filename)
     column_indices = find_indices(lines, column_names)
     map_result_list = []
     for line in lines:
         map_result = map_func(line, column_indices)
-        if map_result != (None, None):
+        if None not in map_result:
             map_result_list.append(map_result)
 
     return map_result_list
@@ -130,6 +130,7 @@ def map_empty(line, column_indices):
     column_indices : list of int
         List containing the indices of Passengers, Seats, and
         Flights columns.
+
     Returns
     -------
     tuple of (float, int) or (None, None)
@@ -212,7 +213,7 @@ reduce_empty_partial = apply_reduce(shuffle_empty_result, reduce_flights)
 reduce_empty_partial
 
 reduce_empty_full = sum(x[1] for x in reduce_empty_partial)
-print("The number of almost empty flights is", reduce_empty_full)
+print(f"The number of almost empty flights is {reduce_empty_full}.")
 
 
 # Question 2
@@ -276,6 +277,7 @@ def map_connections1(line, column_indices):
     column_indices : list of int
         List containing the indices of Origin_city, Destination_city,
         Flights, and Fly_date columns.
+
     Returns
     -------
     tuple of ((str, str, str), int)
@@ -368,46 +370,46 @@ reduce_connections_result2[:5]
 
 
 # Question 5
-def map_full(line, column_indices):
-    """
-    Create a tuple for flights having 100% occupancy rate.
-
-    Parameters
-    ----------
-    line : list of str
-        Each line of a text file split into a list.
-    column_indices : list of int
-        List containing the indices of Passengers, Seats, and
-        Flights columns.
-    Returns
-    -------
-    tuple of (float, int) or (None, None)
-        Each tuple is (occupancy rate, flight count) if occupancy
-        rate is 100%. Otherwise, it is (None, None).
-
-    """
-    passenger_idx, seats_idx, flights_idx = column_indices
-    passengers = int(line[passenger_idx])
-    seats = int(line[seats_idx])
-    try:
-        occupancy_rate = passengers / seats
-        if occupancy_rate == 1:
-            flight_count = int(line[flights_idx])
-            return occupancy_rate, flight_count
-        else:
-            return None, None
-    except ZeroDivisionError:
-        return None, None
-
-
-map_full_result = apply_map(FILENAME, map_full, columns1)
-map_full_result[:7]
-
-shuffle_full_result = shuffle_flights(map_full_result)
-shuffle_full_result[1.0][:10]
-
-reduce_full = apply_reduce(shuffle_full_result, reduce_flights)
-print("The number of full flights is", reduce_full[0][1])
+# def map_full(line, column_indices):
+#     """
+#     Create a tuple for flights having 100% occupancy rate.
+#
+#     Parameters
+#     ----------
+#     line : list of str
+#         Each line of a text file split into a list.
+#     column_indices : list of int
+#         List containing the indices of Passengers, Seats, and
+#         Flights columns.
+#     Returns
+#     -------
+#     tuple of (float, int) or (None, None)
+#         Each tuple is (occupancy rate, flight count) if occupancy
+#         rate is 100%. Otherwise, it is (None, None).
+#
+#     """
+#     passenger_idx, seats_idx, flights_idx = column_indices
+#     passengers = int(line[passenger_idx])
+#     seats = int(line[seats_idx])
+#     try:
+#         occupancy_rate = passengers / seats
+#         if occupancy_rate == 1:  # changed line 1
+#             flight_count = int(line[flights_idx])
+#             return occupancy_rate, flight_count  # changed line 2
+#         else:
+#             return None, None
+#     except ZeroDivisionError:
+#         return None, None
+#
+#
+# map_full_result = apply_map(FILENAME, map_full, columns1)
+# map_full_result[:7]
+#
+# shuffle_full_result = shuffle_flights(map_full_result)
+# shuffle_full_result[1.0][:10]
+#
+# reduce_full = apply_reduce(shuffle_full_result, reduce_flights)
+# print("The number of full flights is", reduce_full[0][1])
 
 
 def map_full(line, column_indices):
@@ -421,6 +423,7 @@ def map_full(line, column_indices):
     column_indices : list of int
         List containing the indices of Passengers, Seats, and
         Flights columns.
+
     Returns
     -------
     tuple of (int, int) or (None, None)
@@ -435,7 +438,7 @@ def map_full(line, column_indices):
     try:
         occupancy_rate = passengers / seats
         flight_count = int(line[flights_idx])
-        if occupancy_rate == 1:  # The only line that changes
+        if occupancy_rate == 1:
             return 1, flight_count
         else:
             return 0, flight_count
@@ -452,7 +455,79 @@ shuffle_full_result[1.0][:10]
 reduce_full = apply_reduce(shuffle_full_result, reduce_flights)
 reduce_full.sort()
 reduce_full
-print("The number of full flights is", reduce_full[1][1])
+
+number_full = reduce_full[1][1]
+share_full = reduce_full[1][1] / (reduce_full[0][1]+reduce_full[1][1])
+print(f"The number of full flights is {number_full}.")
+print(f"The share of full flights is {share_full*100:.2f}%.")
 
 
 # Question 6
+def map_proportion(line, column_indices):
+    """
+
+    Parameters
+    ----------
+    line : list of str
+        Each line of a text file split into a list.
+    column_indices : list of int
+        List containing the indices of Origin_city, Passengers,
+        Seats, and Flights columns.
+
+    Returns
+    -------
+
+    """
+    city_idx = column_indices[0]
+    city = line[city_idx]
+    new_column_indices = column_indices[1:]
+    is_full_tuple = map_full(line, new_column_indices)
+    if is_full_tuple != (None, None):
+        return city, is_full_tuple
+    else:
+        return None, is_full_tuple
+
+
+columns6 = ("Origin_city", "Passengers", "Seats", "Flights")
+map_proportion_result = apply_map(FILENAME, map_proportion, columns6)
+map_proportion_result[:-7]
+
+shuffle_proportion_result = shuffle_flights(map_proportion_result)
+shuffle_proportion_result["Los Angeles: CA"][:10]
+
+
+def reduce_proportion(counts_dict, key):
+    """
+    Compute the weighted average of all values for the given key.
+
+    Parameters
+    ----------
+    counts_dict : dict of {hashable type : list of tuple}
+        Keys are the individual values of the grouping variable,
+        and values are the lists of tuples corresponding to same key.
+        The first element of each tuple is the value to be averaged,
+        and the second element is the corresponding weight.
+    key : hashable type
+        Individual value of the grouping variable for which we
+        need a weighted average.
+
+    Returns
+    -------
+    tuple of (hashable type, float)
+        tuple of the form (key, weighted average of all values).
+
+    """
+    value_weight_list = counts_dict[key]
+    sum_of_weights = 0
+    weighted_sum = 0
+    for value, weight in value_weight_list:
+        weighted_sum += value * weight
+        sum_of_weights += weight
+
+    weighted_mean = weighted_sum / sum_of_weights
+    return key, weighted_mean
+
+
+reduce_proportion_result = apply_reduce(shuffle_proportion_result, reduce_proportion)
+reduce_percent_result = [(key, share*100) for key, share in reduce_proportion_result]
+reduce_percent_result[:7]
