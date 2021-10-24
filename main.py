@@ -151,8 +151,8 @@ def map_empty(line, column_indices):
         return None, None
 
 
-columns = ("Passengers", "Seats", "Flights")
-map_empty_result = apply_map(FILENAME, map_empty, columns)
+columns1 = ("Passengers", "Seats", "Flights")
+map_empty_result = apply_map(FILENAME, map_empty, columns1)
 map_empty_result[:7]
 
 
@@ -240,67 +240,20 @@ def map_flights(line, column_indices):
     return group_var, flight_count
 
 
-columns = ("Destination_airport", "Flights")
-map_top_airports = apply_map(FILENAME, map_flights, columns)
+columns2 = ("Destination_airport", "Flights")
+map_top_airports = apply_map(FILENAME, map_flights, columns2)
 map_top_airports[:10]
-
-
-# def shuffle_top_flights(tuples_list):
-#     """
-#     Aggregate flight counts by the grouping variable.
-#
-#     Parameters
-#     ----------
-#     tuples_list : list of (group type, int)
-#         Group type is the type of the grouping variable.
-#
-#     Returns
-#     -------
-#     defaultdict of {group type : list of int}
-#         Keys are the levels of the grouping variable, and the values
-#         are lists of flight counts corresponding to each group level.
-#
-#     """
-#     result = defaultdict(list)
-#     for group_var, flight_count in tuples_list:
-#         result[group_var].append(flight_count)
-#     return result
-
 
 shuffle_top_airports = shuffle_flights(map_top_airports)
 shuffle_top_airports["END"]
-
-
-# def reduce_top_flights(group_dict, key):
-#     """
-#     Sum all flights corresponding to the same `key`.
-#
-#     Parameters
-#     ----------
-#     group_dict : dict of {group type : list of int}
-#         Keys are the levels of the grouping variable, and the values
-#         are lists of flight counts corresponding to each group level.
-#     key : grouping variable type
-#         Individual value of the grouping variable to sum flights for.
-#
-#     Returns
-#     -------
-#     tuple of (group type, int)
-#         Consists of one value of the grouping variable and the total
-#         number of flights corresponding to that value.
-#     """
-#     flight_count = sum(group_dict[key])
-#     return key, flight_count
-
 
 reduce_top_airports = apply_reduce(shuffle_top_airports, reduce_flights)
 reduce_top_airports.sort(key=lambda x: x[1], reverse=True)
 print("The top-5 airports are", reduce_top_airports[:5])
 
-
 # Question 3
-columns = ("Destination_city", "Flights")
-map_top_cities = apply_map(FILENAME, map_flights, columns)
+columns3 = ("Destination_city", "Flights")
+map_top_cities = apply_map(FILENAME, map_flights, columns3)
 map_top_cities[:10]
 
 shuffle_top_cities = shuffle_flights(map_top_cities)
@@ -341,62 +294,12 @@ def map_connections1(line, column_indices):
     return joint_key, flights
 
 
-columns = ("Origin_city", "Destination_city", "Flights", "Fly_date")
-map_connections_result1 = apply_map(FILENAME, map_connections1, columns)
+columns4 = ("Origin_city", "Destination_city", "Flights", "Fly_date")
+map_connections_result1 = apply_map(FILENAME, map_connections1, columns4)
 map_connections_result1[:10]
-
-
-# def shuffle_connections1(map_pairs):
-#     """
-#     Aggregate flights between two cities by month/year.
-#
-#     Parameters
-#     ----------
-#     map_pairs : list of ((str, str, str), int)
-#         List of tuples, where each tuple is of the form
-#         ((date, city1, city2), flight count).
-#
-#     Returns
-#     -------
-#     defaultdict of {(str, str, str) : list of int}
-#         Keys are tuples of (date, city1, city2), and values
-#         are the lists of flight counts between the two cities.
-#
-#     """
-#     count_dict = defaultdict(list)
-#     for key, flight in map_pairs:
-#         count_dict[key].append(flight)
-#     return count_dict
-
 
 shuffle_connections_result1 = shuffle_flights(map_connections_result1)
 shuffle_connections_result1[("1990-02", "Bend: OR", "Seattle: WA")]
-
-
-# def reduce_connections1(flights_dict):
-#     """
-#     Sum flights between pairs of cities by month/year.
-#
-#     Parameters
-#     ----------
-#     flights_dict : dict of {(str, str, str) : list of int}
-#         Keys are tuples of (date, city1, city2), and values
-#         are the lists of flight counts between the two cities.
-#
-#     Returns
-#     -------
-#     list of ((str, str, str), int)
-#         List of tuples of the form ((date, city1, city2), count),
-#         where count is the total number of flights between the
-#         two cities by month/year.
-#
-#     """
-#     monthly_flights = []
-#     for key, values in flights_dict.items():
-#         monthly_sum = sum(values)
-#         monthly_flights.append((key, monthly_sum))
-#     return monthly_flights
-
 
 reduce_connections_result1 = apply_reduce(shuffle_connections_result1, reduce_flights)
 reduce_connections_result1[:10]
@@ -430,29 +333,6 @@ for key, flights in reduce_connections_result1:
     map_connections_result2.append(map_result)
 
 map_connections_result2[:10]
-
-
-# def shuffle_connections2(map_pairs):
-#     """
-#     Aggregate flights that took place in the same month/year.
-#
-#     Parameters
-#     ----------
-#     map_pairs : list of (str, (str, str, int))
-#         List of tuples of the form (date, (city1, city2, count))
-#
-#     Returns
-#     -------
-#     defaultdict of {str : list of (str, str, int)}
-#         Keys are dates, and values are lists of tuples of the form
-#         (city1, city2, count).
-#
-#     """
-#     flight_dict = defaultdict(list)
-#     for key, value in map_pairs:
-#         flight_dict[key].append(value)
-#     return flight_dict
-
 
 shuffle_connections_result2 = shuffle_flights(map_connections_result2)
 shuffle_connections_result2['1999-01']
@@ -488,4 +368,91 @@ reduce_connections_result2[:5]
 
 
 # Question 5
+def map_full(line, column_indices):
+    """
+    Create a tuple for flights having 100% occupancy rate.
 
+    Parameters
+    ----------
+    line : list of str
+        Each line of a text file split into a list.
+    column_indices : list of int
+        List containing the indices of Passengers, Seats, and
+        Flights columns.
+    Returns
+    -------
+    tuple of (float, int) or (None, None)
+        Each tuple is (occupancy rate, flight count) if occupancy
+        rate is 100%. Otherwise, it is (None, None).
+
+    """
+    passenger_idx, seats_idx, flights_idx = column_indices
+    passengers = int(line[passenger_idx])
+    seats = int(line[seats_idx])
+    try:
+        occupancy_rate = passengers / seats
+        if occupancy_rate == 1:
+            flight_count = int(line[flights_idx])
+            return occupancy_rate, flight_count
+        else:
+            return None, None
+    except ZeroDivisionError:
+        return None, None
+
+
+map_full_result = apply_map(FILENAME, map_full, columns1)
+map_full_result[:7]
+
+shuffle_full_result = shuffle_flights(map_full_result)
+shuffle_full_result[1.0][:10]
+
+reduce_full = apply_reduce(shuffle_full_result, reduce_flights)
+print("The number of full flights is", reduce_full[0][1])
+
+
+def map_full(line, column_indices):
+    """
+    Create a tuple for flights depending on their occupancy rate.
+
+    Parameters
+    ----------
+    line : list of str
+        Each line of a text file split into a list.
+    column_indices : list of int
+        List containing the indices of Passengers, Seats, and
+        Flights columns.
+    Returns
+    -------
+    tuple of (int, int) or (None, None)
+        Each tuple is (dummy key, flight count). The dummy key
+        is 1 if the occupancy rate is 100% and 0 otherwise. The
+        return values is (None, None) if seats count is zero.
+
+    """
+    passenger_idx, seats_idx, flights_idx = column_indices
+    passengers = int(line[passenger_idx])
+    seats = int(line[seats_idx])
+    try:
+        occupancy_rate = passengers / seats
+        flight_count = int(line[flights_idx])
+        if occupancy_rate == 1:  # The only line that changes
+            return 1, flight_count
+        else:
+            return 0, flight_count
+    except ZeroDivisionError:
+        return None, None
+
+
+map_full_result = apply_map(FILENAME, map_full, columns1)
+map_full_result[:7]
+
+shuffle_full_result = shuffle_flights(map_full_result)
+shuffle_full_result[1.0][:10]
+
+reduce_full = apply_reduce(shuffle_full_result, reduce_flights)
+reduce_full.sort()
+reduce_full
+print("The number of full flights is", reduce_full[1][1])
+
+
+# Question 6
