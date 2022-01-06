@@ -1,0 +1,1377 @@
+{
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "metadata": {
+    "id": "JfstpKhUM8x7"
+   },
+   "source": [
+    "<h1><center>Big Data Algorithms Techniques & Platforms</center></h1>\n",
+    "<h2>\n",
+    "<hr style=\" border:none; height:3px;\">\n",
+    "<center>Assignment 4 - MapReduce and Spark</center>\n",
+    "<hr style=\" border:none; height:3px;\">\n",
+    "</h2>"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {
+    "id": "JWwndZSiM8x8"
+   },
+   "source": [
+    "# Introduction\n",
+    "\n",
+    "\n",
+    "<p align=\"justify\">\n",
+    "<font size=\"3\">\n",
+    "In this exercise you are asked to use Spark for implementing an algorithm that applies computations on documents and dataframes.\n",
+    "</font>\n",
+    "</p>\n",
+    "\n",
+    "<p align=\"justify\">\n",
+    "<hr style=\" border:none; height:2px;\">\n",
+    " <font  size=\"3\" color='#91053d'>**Execute the following cell in order to initialize Spark**</font>\n",
+    "<hr style=\" border:none; height:2px;\">\n",
+    "</p>"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 1,
+   "metadata": {
+    "colab": {
+     "base_uri": "https://localhost:8080/"
+    },
+    "id": "3shtJGpOM8x8",
+    "outputId": "8b100790-dcef-44a6-da62-524a60617907"
+   },
+   "outputs": [],
+   "source": [
+    "# !apt-get update\n",
+    "# !apt-get install openjdk-8-jdk-headless -qq > /dev/null\n",
+    "# !wget -q https://downloads.apache.org/spark/spark-3.0.3/spark-3.0.3-bin-hadoop2.7.tgz\n",
+    "# !tar zxvf spark-3.0.3-bin-hadoop2.7.tgz\n",
+    "# !pip install -q findspark\n",
+    "\n",
+    "# import os\n",
+    "# os.environ[\"JAVA_HOME\"] = \"/usr/lib/jvm/java-8-openjdk-amd64\"\n",
+    "# os.environ[\"SPARK_HOME\"] = \"/content/spark-3.0.3-bin-hadoop2.7\"\n",
+    "\n",
+    "\n",
+    "import findspark\n",
+    "findspark.init()"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {
+    "id": "KK49MFw9M8yA"
+   },
+   "source": [
+    "# Analysing documents\n",
+    "\n",
+    "\n",
+    "<p align=\"justify\">\n",
+    "<font size=\"3\">\n",
+    "We have already seen that MapReduce procedures are good in analyzing text-files.\n",
+    "    \n",
+    "The provided data come from a scraping operation on the website https://www.vagalume.com.br/ and is available on kaggle:\n",
+    "    \n",
+    "https://www.kaggle.com/neisse\n",
+    "    \n",
+    "\n",
+    "    \n",
+    "The assignment is divided in 2 parts:\n",
+    "    \n",
+    "* Part 1 focuses on MapReduce \n",
+    "    \n",
+    "* Part 2 focuses on dataframes\n",
+    "    </font>\n",
+    "    </p>\n",
+    "    \n",
+    "<p align=\"justify\">\n",
+    "<hr style=\" border:none; height:2px;\">\n",
+    " <font  size=\"3\" color='#91053d'>Notice that  dataset is noisy and shows all the typical issues related to data coming from this procedure (duplicated entries, etc).</font>\n",
+    "<hr style=\" border:none; height:2px;\">\n",
+    "</p>"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {
+    "id": "KK49MFw9M8yA"
+   },
+   "source": [
+    "# Part 1 -  MapReduce\n",
+    "<p align=\"justify\">\n",
+    "<font size=\"3\">\n",
+    "In the provided folder you can find a set of documents/files containing  descriptions of songs (lyrics and additional informations). Specifically in each file:\n",
+    "\n",
+    "- the first line is the idiom/language\n",
+    "- the second line is the title of a song\n",
+    "- the third line is the relative url of the song of the original website\n",
+    "- from fourth line in the text you find the lyrics of the song.\n",
+    "    </font>\n",
+    "    </p>\n",
+    "\n",
+    "## Exercise 1 - (2 points) - Song's lyrics \n",
+    "\n",
+    "<p align=\"justify\">\n",
+    "<font size=\"3\">\n",
+    "Provide a Spark MapReduce procedure that reads the documents and checks how many song's lyrics appear at least two times.\n",
+    "\n",
+    "In the data-interpretation of this exercise you can consider that two files represent the same lyric if the url (3rd line of each file) is the same.\n",
+    "\n",
+    " </font>\n",
+    "</p>\n",
+    "\n",
+    "<p align=\"justify\">\n",
+    "<hr style=\" border:none; height:2px;\">\n",
+    " <font  size=\"3\" color='#91053d'>Notice that  you can reuse any code that was made available for the previous labs/assignments or that you already developed in these contexts.</font>\n",
+    "<hr style=\" border:none; height:2px;\">\n",
+    "</p>"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 2,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import re\n",
+    "\n",
+    "def find_url(line):\n",
+    "    \"\"\"\n",
+    "    Return the url of each text file.\n",
+    "\n",
+    "    Parameters\n",
+    "    ----------\n",
+    "    line: tuple of (str, str)\n",
+    "        A key-value pair, where the key is the full path of each \n",
+    "        file, the value is the content of each text file.\n",
+    "\n",
+    "    Returns\n",
+    "    -------\n",
+    "    tuple of (str, int)\n",
+    "        The key is the relative url of a song and the value is 1.\n",
+    "\n",
+    "    \"\"\"\n",
+    "    contents = line[1]\n",
+    "    components = re.compile(r\"\\n\").split(contents)\n",
+    "    url = components[1]\n",
+    "    return url, 1"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 3,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "WARNING: An illegal reflective access operation has occurred\n",
+      "WARNING: Illegal reflective access by org.apache.spark.unsafe.Platform (file:/usr/local/Cellar/apache-spark/3.2.0/libexec/jars/spark-unsafe_2.12-3.2.0.jar) to constructor java.nio.DirectByteBuffer(long,int)\n",
+      "WARNING: Please consider reporting this to the maintainers of org.apache.spark.unsafe.Platform\n",
+      "WARNING: Use --illegal-access=warn to enable warnings of further illegal reflective access operations\n",
+      "WARNING: All illegal access operations will be denied in a future release\n",
+      "Using Spark's default log4j profile: org/apache/spark/log4j-defaults.properties\n",
+      "Setting default log level to \"WARN\".\n",
+      "To adjust logging level use sc.setLogLevel(newLevel). For SparkR, use setLogLevel(newLevel).\n",
+      "22/01/01 17:07:38 WARN NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable\n",
+      "22/01/01 17:08:59 WARN TaskSetManager: Stage 0 contains a task of very large size (26213 KiB). The maximum recommended task size is 1000 KiB.\n",
+      "[Stage 1:>                                                          (0 + 1) / 1]\r"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "The number of duplicates is 38096\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "\r",
+      "                                                                                \r"
+     ]
+    }
+   ],
+   "source": [
+    "from pyspark import SparkConf, SparkContext\n",
+    "\n",
+    "conf = SparkConf().setMaster(\"local\").setAppName(\"DuplicateLyrics\")\n",
+    "sc = SparkContext.getOrCreate(conf = conf)\n",
+    "\n",
+    "input_file = sc.wholeTextFiles(\"lyrics_files_idioms/*\")\n",
+    "urls = input_file.map(find_url)\n",
+    "url_counts = urls.reduceByKey(lambda x, y: x + y)\n",
+    "duplicate_songs = url_counts.filter(lambda x: x[1] > 1)\n",
+    "print(\"The number of duplicates is\", duplicate_songs.count())"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {
+    "id": "KK49MFw9M8yA"
+   },
+   "source": [
+    "## Exercise 2\n",
+    "\n",
+    "### 2.1 - (1 point) - Distinct songs\n",
+    "Provide a Spark MapReduce procedure that provides how many distinct song's lyrics are present.\n",
+    "\n",
+    "Also in this case consider the url as the key: two files represent the same lyric if the url is equal.\n",
+    "\n",
+    "### 2.2 - (1 point) - Chaining MapReduce steps\n",
+    "According to your implementation of Exercise 1, can you chain MapReduce additional MapReduce steps for solving Exercise 2.1? \n",
+    "\n",
+    "**Answer:** In Exercise 1, I have already filtered away songs whose lyrics appear only once. Therefore, it is not possible to solve Exercise 2.1 based only on the last result of Exercise 1, which is `duplicate_songs`. However, it is possible to to arrive at the number of distinct songs if one takes advantage of the `url_counts` rdd and changes only the last line of my code for Exercise 1."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 4,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "The number of distinct songs is 167499\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "\r",
+      "[Stage 3:>                                                          (0 + 1) / 1]\r",
+      "\r",
+      "                                                                                \r"
+     ]
+    }
+   ],
+   "source": [
+    "print(\"The number of distinct songs is\", url_counts.count())"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "As an alternative solution, one can subtract the number of duplicate songs from the total number of text files. To this end, we should transform the `duplicate_songs` rdd slightly."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 5,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "22/01/01 17:12:23 WARN TaskSetManager: Stage 4 contains a task of very large size (26213 KiB). The maximum recommended task size is 1000 KiB.\n",
+      "                                                                                \r"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "The number of distinct songs is 167499\n"
+     ]
+    }
+   ],
+   "source": [
+    "total_songs = urls.count()\n",
+    "duplicate_lines = duplicate_songs.mapValues(lambda count: count-1)\\\n",
+    "    .values()\\\n",
+    "    .sum()\n",
+    "\n",
+    "distinct_songs = total_songs - duplicate_lines\n",
+    "print(\"The number of distinct songs is\", distinct_songs)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "# Exercise 3\n",
+    "\n",
+    "### 3.1 - (3 points) - Most common word for language\n",
+    "\n",
+    "Now that you discovered the duplicated documents consider just one occurence of each song's lyric and define a MapReduce procedure that finds the most common word for each language (of course you must remove stop words)."
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "**Note:** I have downloaded stopwords file at this [link](https://github.com/6/stopwords-json). These stopwords are used inside the following two functions."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 6,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import json\n",
+    "from collections import defaultdict\n",
+    " \n",
+    "with open(\"stopwords-all.json\", \"r\") as stopword_file:\n",
+    "    stopwords = json.load(stopword_file)\n",
+    "\n",
+    "stopwords_new = defaultdict(set)\n",
+    "for key, value in stopwords.items():\n",
+    "    stopwords_new[key] = set(value)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 7,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# !pip install iso639-lang\n",
+    "from iso639 import Lang\n",
+    "\n",
+    "def return_words(line):\n",
+    "    \"\"\"\n",
+    "    Return the language of and words in each text file.\n",
+    "\n",
+    "    Parameters\n",
+    "    ----------\n",
+    "    line: tuple of (str, str)\n",
+    "        A key-value pair, where the key is the full path of each \n",
+    "        file, the value is the content of each text file.\n",
+    "\n",
+    "    Returns\n",
+    "    -------\n",
+    "    tuple of (str, tuple of str)\n",
+    "        Key is the language and the value is a tuple of words in a\n",
+    "        file after removing stopwords.\n",
+    "\n",
+    "    \"\"\"\n",
+    "    contents = line[1]\n",
+    "    components = re.compile(r\"\\n\").split(contents)\n",
+    "    language = components[0].title()\n",
+    "    if language == \"Na\":\n",
+    "        return language, tuple()\n",
+    "\n",
+    "    try:\n",
+    "        language_code = Lang(language).pt1\n",
+    "    except:\n",
+    "        language_code = \"absent\"\n",
+    "    finally:\n",
+    "        text = components[3].lower()\n",
+    "        words = re.compile(r\"[.:;,\\s\\?!\\[\\]\\(\\)\\\"&\\*/]+\").split(text)\n",
+    "        words_without_stopwords = []\n",
+    "        current_stopwords = stopwords_new[language_code]\n",
+    "        for word in words:\n",
+    "            if len(word) > 3:\n",
+    "                if word not in current_stopwords:\n",
+    "                    words_without_stopwords.append(word)\n",
+    "\n",
+    "        words_without_stopwords = tuple(words_without_stopwords)\n",
+    "        return language, words_without_stopwords"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 8,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "22/01/01 17:15:48 WARN TaskSetManager: Stage 7 contains a task of very large size (26213 KiB). The maximum recommended task size is 1000 KiB.\n",
+      "                                                                                \r"
+     ]
+    },
+    {
+     "data": {
+      "text/plain": [
+       "[('English', ('love', 144294)),\n",
+       " ('Portuguese', ('amor', 74785)),\n",
+       " ('Italian', ('amore', 385)),\n",
+       " ('Spanish', ('amor', 6676)),\n",
+       " ('French', (\"c'est\", 626)),\n",
+       " ('Basque', ('nire', 12)),\n",
+       " ('Kinyarwanda', ('kimi', 112)),\n",
+       " ('German', ('komm', 192)),\n",
+       " ('Icelandic', ('allt', 32)),\n",
+       " ('Tagalog', ('bebot', 72)),\n",
+       " ('Irish', ('mummy', 16)),\n",
+       " ('Swedish', ('honey', 32)),\n",
+       " ('Serbian', ('nego', 8)),\n",
+       " ('Finnish', ('joulu', 10)),\n",
+       " ('Norwegian', ('vestido', 32)),\n",
+       " ('Galician', ('paso', 36)),\n",
+       " ('Sundanese', ('nanananananananananananana', 16)),\n",
+       " ('Indonesian', ('your', 36)),\n",
+       " ('Russian', ('стиле', 25)),\n",
+       " ('Turkish', ('loco', 19)),\n",
+       " ('Croatian', ('predaka', 8)),\n",
+       " ('Hmong', ('sento', 32)),\n",
+       " ('Catalan', ('barcelona', 24)),\n",
+       " ('Estonian', ('kuldseks', 19)),\n",
+       " ('Afrikaans', ('alles', 3)),\n",
+       " ('Danish', ('forever', 105)),\n",
+       " ('Malay', ('sing', 4)),\n",
+       " ('Dutch', ('nimma', 40)),\n",
+       " ('Japanese', ('rock', 18)),\n",
+       " ('Malagasy', ('tanto', 30)),\n",
+       " ('Haitian_Creole', ('mwen', 60)),\n",
+       " ('Arabic', (\"lejo'\", 15)),\n",
+       " ('Kurdish', ('kevin', 12)),\n",
+       " ('Cebuano', ('tibum', 32)),\n",
+       " ('Polish', ('policz', 6)),\n",
+       " ('Romanian', ('tenímmoce', 2)),\n",
+       " ('Ganda', ('ddara', 48)),\n",
+       " ('Slovak', ('uncoolohol', 16)),\n",
+       " ('Slovenian', ('nekej', 9)),\n",
+       " ('Swahili', ('pouss', 28)),\n",
+       " ('Sesotho', ('bayo', 30)),\n",
+       " ('Nyanja', ('machika', 69)),\n",
+       " ('Korean', ('재수없어', 9)),\n",
+       " ('Czech', ('senta', 13)),\n",
+       " ('Bosnian', ('jedan', 5)),\n",
+       " ('Welsh', ('sally', 8)),\n",
+       " ('Hungarian', ('virágom', 4))]"
+      ]
+     },
+     "execution_count": 8,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "# removed empty files and duplicates here\n",
+    "\n",
+    "common_words = input_file.map(return_words)\\\n",
+    "    .filter(lambda x: x[0] != \"Na\")\\\n",
+    "    .distinct()\\\n",
+    "    .flatMapValues(lambda x: x)\\\n",
+    "    .map(lambda x: ((x[0], x[1]), 1))\\\n",
+    "    .reduceByKey(lambda x, y: x + y)\\\n",
+    "    .map(lambda x: (x[0][0], (x[0][1], x[1])))\\\n",
+    "    .reduceByKey(lambda x, y: x if x[1] >= y[1] else y)\n",
+    "\n",
+    "common_words.collect()"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### 3.2 - (3 points) - Most common end/start words\n",
+    "\n",
+    "Finally discover, for each language, the most common ending and starting word. Of course, you must remove stop words."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 9,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "def first_and_last_words(line):\n",
+    "    \"\"\"\n",
+    "    Return the url, language, first word, and last word of\n",
+    "    each text file.\n",
+    "\n",
+    "    Parameters\n",
+    "    ----------\n",
+    "    line: tuple of (str, str)\n",
+    "        A key-value pair, where the key is the full path of\n",
+    "        each file, the value is the content of each text file.\n",
+    "\n",
+    "    Returns\n",
+    "    -------\n",
+    "    tuple of (str, str, str, str) or (str, str, None, None)\n",
+    "        The url and language of a song are always returned. None \n",
+    "        is returned if the language is \"Na\", or the lyrics does\n",
+    "        not contain any (non-stop) words.\n",
+    "\n",
+    "    \"\"\"\n",
+    "    contents = line[1]\n",
+    "    components = re.compile(r\"\\n\").split(contents)\n",
+    "    language = components[0].title()\n",
+    "    url = components[1]\n",
+    "    if language == \"Na\":\n",
+    "        return url, language, None, None\n",
+    "\n",
+    "    try:\n",
+    "        language_code = Lang(language).pt1\n",
+    "    except:\n",
+    "        language_code = \"absent\"\n",
+    "    finally:\n",
+    "        text = components[3].lower()\n",
+    "        words = re.compile(r\"[.:;,\\s\\?!\\[\\]\\(\\)\\\"&\\*/]+\").split(text)\n",
+    "        current_stopwords = stopwords_new[language_code]\n",
+    "        first_word_idx = 0\n",
+    "        first_word = \"\"\n",
+    "        while len(first_word) <= 3 or first_word in current_stopwords:\n",
+    "            if first_word_idx < len(words):\n",
+    "                first_word = words[first_word_idx]\n",
+    "                first_word_idx += 1\n",
+    "            else:\n",
+    "                return url, language, None, None\n",
+    "\n",
+    "        last_word_idx = len(words) - 1\n",
+    "        last_word = \"\"\n",
+    "        while len(last_word) <= 3 or last_word in current_stopwords:\n",
+    "            last_word = words[last_word_idx]\n",
+    "            last_word_idx -= 1\n",
+    "\n",
+    "        return url, language, first_word, last_word"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 10,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "22/01/01 17:20:27 WARN TaskSetManager: Stage 11 contains a task of very large size (26213 KiB). The maximum recommended task size is 1000 KiB.\n",
+      "                                                                                \r"
+     ]
+    },
+    {
+     "data": {
+      "text/plain": [
+       "[(('English', 'first'), ('love', 1532)),\n",
+       " (('English', 'last'), ('love', 3231)),\n",
+       " (('Spanish', 'first'), ('quiero', 101)),\n",
+       " (('Spanish', 'last'), ('amor', 177)),\n",
+       " (('Swedish', 'first'), ('vaknar', 2)),\n",
+       " (('Swedish', 'last'), ('herrens', 1)),\n",
+       " (('Portuguese', 'first'), ('amor', 1486)),\n",
+       " (('Portuguese', 'last'), ('amor', 2567)),\n",
+       " (('French', 'first'), (\"c'est\", 15)),\n",
+       " (('French', 'last'), ('refrain', 6)),\n",
+       " (('German', 'first'), ('liebe', 9)),\n",
+       " (('German', 'last'), ('refrain', 5)),\n",
+       " (('Italian', 'first'), ('voglio', 8)),\n",
+       " (('Italian', 'last'), ('amore', 11)),\n",
+       " (('Galician', 'first'), ('bruxa', 1)),\n",
+       " (('Galician', 'last'), ('relato…', 2)),\n",
+       " (('Hmong', 'first'), ('sento', 1)),\n",
+       " (('Hmong', 'last'), ('sento', 1)),\n",
+       " (('Norwegian', 'first'), ('vestido', 1)),\n",
+       " (('Norwegian', 'last'), ('estampado', 1)),\n",
+       " (('Danish', 'first'), ('forever', 2)),\n",
+       " (('Danish', 'last'), ('forever', 7)),\n",
+       " (('Malay', 'first'), ('jangankan', 1)),\n",
+       " (('Malay', 'last'), ('that', 1)),\n",
+       " (('Indonesian', 'first'), ('ingat', 1)),\n",
+       " (('Indonesian', 'last'), ('duga', 1)),\n",
+       " (('Nyanja', 'first'), ('jeon', 1)),\n",
+       " (('Nyanja', 'last'), ('love', 1)),\n",
+       " (('Irish', 'first'), ('feeling', 1)),\n",
+       " (('Irish', 'last'), ('love', 1)),\n",
+       " (('Kinyarwanda', 'first'), ('sora', 4)),\n",
+       " (('Kinyarwanda', 'last'), ('soko', 3)),\n",
+       " (('Croatian', 'first'), ('nikad', 1)),\n",
+       " (('Croatian', 'last'), ('krilo', 1)),\n",
+       " (('Sundanese', 'first'), ('uyeonhi', 1)),\n",
+       " (('Sundanese', 'last'), ('geoya', 1)),\n",
+       " (('Tagalog', 'first'), ('bebot', 1)),\n",
+       " (('Tagalog', 'last'), ('philipino', 1)),\n",
+       " (('Kurdish', 'first'), (\"tala'al-badru\", 1)),\n",
+       " (('Kurdish', 'last'), ('lillahi', 1)),\n",
+       " (('Russian', 'first'), ('дмитрий', 1)),\n",
+       " (('Russian', 'last'), ('мечтаю', 1)),\n",
+       " (('Catalan', 'first'), ('dancefloor', 1)),\n",
+       " (('Catalan', 'last'), ('barcelona', 1)),\n",
+       " (('Dutch', 'first'), ('from', 1)),\n",
+       " (('Dutch', 'last'), ('kent', 1)),\n",
+       " (('Arabic', 'first'), ('حاتم', 1)),\n",
+       " (('Arabic', 'last'), (\"lejo'\", 1)),\n",
+       " (('Estonian', 'first'), ('elus', 2)),\n",
+       " (('Estonian', 'last'), ('kuldseks', 2)),\n",
+       " (('Basque', 'first'), ('naiz', 2)),\n",
+       " (('Basque', 'last'), ('artu', 2)),\n",
+       " (('Turkish', 'first'), ('bilemem', 1)),\n",
+       " (('Turkish', 'last'), ('geci', 1)),\n",
+       " (('Malagasy', 'first'), ('gustas', 1)),\n",
+       " (('Malagasy', 'last'), ('oh-oh', 1)),\n",
+       " (('Japanese', 'first'), ('singing', 1)),\n",
+       " (('Japanese', 'last'), ('彼のために泣いているんだね', 1)),\n",
+       " (('Serbian', 'first'), ('srce', 1)),\n",
+       " (('Serbian', 'last'), ('pobedu', 1)),\n",
+       " (('Slovenian', 'first'), ('mimo', 1)),\n",
+       " (('Slovenian', 'last'), ('dress', 1)),\n",
+       " (('Czech', 'first'), ('posso', 1)),\n",
+       " (('Czech', 'last'), ('senta', 1)),\n",
+       " (('Cebuano', 'first'), ('parará', 1)),\n",
+       " (('Cebuano', 'last'), ('tibum', 1)),\n",
+       " (('Romanian', 'first'), ('tenímmoce', 1)),\n",
+       " (('Romanian', 'last'), ('core', 1)),\n",
+       " (('Swahili', 'first'), ('long', 2)),\n",
+       " (('Swahili', 'last'), ('pouss', 2)),\n",
+       " (('Finnish', 'first'), ('naisiin', 1)),\n",
+       " (('Finnish', 'last'), ('tyttöni', 1)),\n",
+       " (('Slovak', 'first'), ('raging', 1)),\n",
+       " (('Slovak', 'last'), ('uncool', 1)),\n",
+       " (('Bosnian', 'first'), ('mene', 1)),\n",
+       " (('Bosnian', 'last'), ('jasno', 1)),\n",
+       " (('Hungarian', 'first'), ('tavaszi', 1)),\n",
+       " (('Hungarian', 'last'), ('virágom', 1)),\n",
+       " (('Afrikaans', 'first'), ('lede', 1)),\n",
+       " (('Afrikaans', 'last'), ('yeah', 1)),\n",
+       " (('Icelandic', 'first'), ('brosandi', 1)),\n",
+       " (('Icelandic', 'last'), ('hopelandic', 2)),\n",
+       " (('Sesotho', 'first'), ('translation', 1)),\n",
+       " (('Sesotho', 'last'), ('spirit', 1)),\n",
+       " (('Welsh', 'first'), ('sterling', 1)),\n",
+       " (('Welsh', 'last'), ('sally', 1)),\n",
+       " (('Polish', 'first'), ('s³ucham', 1)),\n",
+       " (('Polish', 'last'), ('piêciu', 1)),\n",
+       " (('Haitian_Creole', 'first'), ('feat', 1)),\n",
+       " (('Haitian_Creole', 'last'), ('fade', 2)),\n",
+       " (('Korean', 'first'), ('재수없어', 1)),\n",
+       " (('Korean', 'last'), ('without', 1)),\n",
+       " (('Ganda', 'first'), ('2ne1', 1)),\n",
+       " (('Ganda', 'last'), ('ireoke', 1))]"
+      ]
+     },
+     "execution_count": 10,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "# removed empty files and duplicates here\n",
+    "\n",
+    "first_last_words = input_file.map(first_and_last_words)\\\n",
+    "    .filter(lambda x: x[2] != None)\\\n",
+    "    .distinct()\\\n",
+    "    .map(lambda x: (x[1], (x[2], x[3])))\\\n",
+    "    .flatMapValues(lambda x: [(\"first\", x[0]), (\"last\", x[1])])\\\n",
+    "    .map(lambda x: ((x[0], x[1][0], x[1][1]), 1))\\\n",
+    "    .reduceByKey(lambda x, y: x + y)\\\n",
+    "    .map(lambda x: ((x[0][0], x[0][1]), (x[0][2], x[1])))\\\n",
+    "    .reduceByKey(lambda x, y: x if x[1] >= y[1] else y)\n",
+    "\n",
+    "first_last_words.collect()"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {
+    "id": "E-QgxsF1M8yB"
+   },
+   "source": [
+    "\n",
+    "<p align=\"justify\">\n",
+    "<hr style=\" border:none; height:2px;\">\n",
+    " <font  size=\"3\" color='#91053d'>**DataFrames**</font>\n",
+    "<hr style=\" border:none; height:2px;\">\n",
+    "</p>"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {
+    "colab": {
+     "base_uri": "https://localhost:8080/"
+    },
+    "id": "CBkYMzzIM8yB",
+    "outputId": "2f6a99b7-c42d-4401-9a7b-96628f3a0472"
+   },
+   "source": [
+    "# Part 2 - Dataframes\n",
+    "\n",
+    "In this part you can use Pandas Dataframes or  Spark Dataframes.  I suggest to use a Spark Dataframe\n",
+    "end exploit the Pandas functionalities as we have seen in the 2nd assignment. Download the two available datasets at the link:\n",
+    "\n",
+    "https://www.kaggle.com/neisse/scrapped-lyrics-from-6-genres\n",
+    "\n",
+    "You can find two .cvs files: \n",
+    "\n",
+    "* artists-data.csv\n",
+    "\n",
+    "* lyrics-data.csv\n",
+    "\n",
+    "\n",
+    "# Import artist data.\n",
+    "<p align=\"justify\">\n",
+    "<font size=\"3\">\n",
+    "The artist data in the .csv file can be stored in a dataframe. \n",
+    "    \n",
+    "Each row of the .csv file describes an artist and the columns represent the following data:\n",
+    "    \n",
+    "* Artist - The artist's name\n",
+    "* Popularity - Popularity score at the date of scraping\n",
+    "* ALink - The link to the artist's page\n",
+    "* AGenre - Primary musical genre of the artist\n",
+    "* AGenres - A list (pay attention to the format) of genres the artist fits in\n",
+    "    \n",
+    "</font>\n",
+    "</p>\n",
+    "\n",
+    "\n",
+    "# Import song's lyrics data.\n",
+    "\n",
+    "\n",
+    "<p align=\"justify\">\n",
+    "<font size=\"3\">\n",
+    "    \n",
+    "Each row of the .csv file describes a lyric and the columns represent the following data:\n",
+    "    \n",
+    "* ALink - The link to the webpage of the artist\n",
+    "* SLink - The link to the webpage of the song\n",
+    "* Idiom - The idiom of the lyric\n",
+    "* Lyric - The lyrics\n",
+    "* SName - The name of the song\n",
+    "\n",
+    "    \n",
+    "\n",
+    "</font>\n",
+    "</p>\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 11,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "+-----------------+-----+----------+-------------------+-----+--------------------+\n",
+      "|           Artist|Songs|Popularity|               Link|Genre|              Genres|\n",
+      "+-----------------+-----+----------+-------------------+-----+--------------------+\n",
+      "|    10000 Maniacs|  110|       0.3|    /10000-maniacs/| Rock|Rock; Pop; Electr...|\n",
+      "|        12 Stones|   75|       0.3|        /12-stones/| Rock|Rock; Gospel/Reli...|\n",
+      "|              311|  196|       0.5|              /311/| Rock|Rock; Surf Music;...|\n",
+      "|    4 Non Blondes|   15|       7.5|    /4-non-blondes/| Rock|Rock; Pop/Rock; R...|\n",
+      "|A Cruz Está Vazia|   13|       0.0|/a-cruz-esta-vazia/| Rock|                Rock|\n",
+      "|  Aborto Elétrico|   36|       0.1|  /aborto-eletrico/| Rock|Rock; Punk Rock; ...|\n",
+      "|            Abril|   36|       0.1|            /abril/| Rock|Rock; Emocore; Ha...|\n",
+      "|            Abuse|   13|       0.0|            /abuse/| Rock|      Rock; Hardcore|\n",
+      "|            AC/DC|  192|      10.8|            /ac-dc/| Rock|Rock; Heavy Metal...|\n",
+      "|            ACEIA|    0|       0.0|            /aceia/| Rock|                Rock|\n",
+      "+-----------------+-----+----------+-------------------+-----+--------------------+\n",
+      "only showing top 10 rows\n",
+      "\n"
+     ]
+    }
+   ],
+   "source": [
+    "from pyspark.sql import SparkSession\n",
+    "import pandas as pd\n",
+    "\n",
+    "spark = SparkSession \\\n",
+    "    .builder \\\n",
+    "    .appName(\"Assignment4\") \\\n",
+    "    .getOrCreate()\n",
+    "\n",
+    "artists = spark.read.option(\"header\", \"true\").option(\"inferSchema\", \"true\")\\\n",
+    "    .csv(\"artists-data.csv\")\n",
+    "\n",
+    "artists.show(10)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "#  Exercise 4 - (3 points) - Artist's genre\n",
+    "\n",
+    "<p align=\"justify\">\n",
+    "<font size=\"3\">\n",
+    "Provide a program that finds the artists for which the genre is not specified.\n",
+    "\n",
+    "</font>\n",
+    "</p>"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 12,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "+------+-----+----------+----+-----+------+\n",
+      "|Artist|Songs|Popularity|Link|Genre|Genres|\n",
+      "+------+-----+----------+----+-----+------+\n",
+      "+------+-----+----------+----+-----+------+\n",
+      "\n"
+     ]
+    }
+   ],
+   "source": [
+    "artists.filter(\"Genre IS NULL\").show(10)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "#  Exercise 5 - (3 points) - Duplicates\n",
+    "\n",
+    "<p align=\"justify\">\n",
+    "<font size=\"3\">\n",
+    "Provide a program that removes the duplicates in the artists (also in this case the URL is the key).\n",
+    "\n",
+    "</font>\n",
+    "</p>\n",
+    "\n",
+    "\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 13,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "(3242, 6)\n"
+     ]
+    }
+   ],
+   "source": [
+    "print((artists.count(), len(artists.columns)))"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 14,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "(2940, 6)\n"
+     ]
+    }
+   ],
+   "source": [
+    "artists_unique = artists.dropDuplicates([\"Link\"])\n",
+    "print((artists_unique.count(), len(artists_unique.columns)))"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "After removing duplicates in artists, the number of rows decreased from 3242 to 2940. Below, we can see the rows of the new Spark DataFrame."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 15,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "+-------------+-----+----------+---------------+-------+--------------------+\n",
+      "|       Artist|Songs|Popularity|           Link|  Genre|              Genres|\n",
+      "+-------------+-----+----------+---------------+-------+--------------------+\n",
+      "|   021 Função|    5|       0.0|   /021-funcao/|Hip Hop|Trip-Hop; Hip Hop...|\n",
+      "|10000 Maniacs|  110|       0.3|/10000-maniacs/|   Rock|Rock; Pop; Electr...|\n",
+      "|    12 Stones|   75|       0.3|    /12-stones/|   Rock|Rock; Gospel/Reli...|\n",
+      "|       14 Bis|  120|       1.8|       /14-bis/|    Pop|MPB; Pop; Folk; R...|\n",
+      "|         18 K|    3|       0.0|         /18-k/|Hip Hop|Hip Hop; Instrume...|\n",
+      "|     2 Chainz|   77|       0.2|     /2-chainz/|Hip Hop|Hip Hop; Rap; Bla...|\n",
+      "|    21 Savage|   11|       1.0|    /21-savage/|Hip Hop|        Hip Hop; Rap|\n",
+      "|          2M1|    6|       0.0|          /2m1/|    Pop|                 Pop|\n",
+      "|       2Multo|    2|       0.0|       /2multo/|Hip Hop|        Hip Hop; Rap|\n",
+      "|         2NE1|  103|       0.4|         /2ne1/|    Pop|K-Pop/K-Rock; Pop...|\n",
+      "+-------------+-----+----------+---------------+-------+--------------------+\n",
+      "only showing top 10 rows\n",
+      "\n"
+     ]
+    }
+   ],
+   "source": [
+    "artists_unique.show(10)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "#  Exercise 6 - (4 points)\n",
+    "\n",
+    "<p align=\"justify\">\n",
+    "<font size=\"3\">\n",
+    "Provide a program that using dataframe return the 100 most popular artists and the lyrics of their songs.\n",
+    "</font>\n",
+    "</p>"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 16,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "+---------------+-----------------+\n",
+      "|         Artist|             Link|\n",
+      "+---------------+-----------------+\n",
+      "|  Ariana Grande|  /ariana-grande/|\n",
+      "|      Lady Gaga|      /lady-gaga/|\n",
+      "|       Maroon 5|       /maroon-5/|\n",
+      "|         Eminem|         /eminem/|\n",
+      "|          Queen|          /queen/|\n",
+      "|Imagine Dragons|/imagine-dragons/|\n",
+      "|          Adele|          /adele/|\n",
+      "|    The Beatles|    /the-beatles/|\n",
+      "|        Beyoncé|        /beyonce/|\n",
+      "|         Anitta|         /anitta/|\n",
+      "+---------------+-----------------+\n",
+      "only showing top 10 rows\n",
+      "\n"
+     ]
+    }
+   ],
+   "source": [
+    "top_artists = artists_unique.sort(artists_unique.Popularity.desc())\\\n",
+    "    .limit(100)\\\n",
+    "    .select(\"Artist\", \"Link\")\n",
+    "\n",
+    "top_artists.show(10)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 17,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "                                                                                \r"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "+---------------+--------------------+--------------------+--------------------+--------------------+\n",
+      "|          ALink|               SName|               SLink|               Lyric|               Idiom|\n",
+      "+---------------+--------------------+--------------------+--------------------+--------------------+\n",
+      "|/10000-maniacs/|      More Than This|/10000-maniacs/mo...|I could feel at t...|             ENGLISH|\n",
+      "|/10000-maniacs/|   Because The Night|/10000-maniacs/be...|Take me now, baby...|             ENGLISH|\n",
+      "|/10000-maniacs/|      These Are Days|/10000-maniacs/th...|These are. These ...|             ENGLISH|\n",
+      "|/10000-maniacs/|     A Campfire Song|/10000-maniacs/a-...|\"A lie to say, \"\"...| \"\"O my. river wh...|\n",
+      "|/10000-maniacs/|Everyday Is Like ...|/10000-maniacs/ev...|Trudging slowly o...|             ENGLISH|\n",
+      "|/10000-maniacs/|          Don't Talk|/10000-maniacs/do...|Don't talk, I wil...|             ENGLISH|\n",
+      "|/10000-maniacs/|   Across The Fields|/10000-maniacs/ac...|Well they left th...|             ENGLISH|\n",
+      "|/10000-maniacs/|Planned Obsolescence|/10000-maniacs/pl...|[ music: Dennis D...|             ENGLISH|\n",
+      "|/10000-maniacs/|           Rainy Day|/10000-maniacs/ra...|On bended kneeI'v...|             ENGLISH|\n",
+      "|/10000-maniacs/|Anthem For Doomed...|/10000-maniacs/an...|For whom do the b...|             ENGLISH|\n",
+      "+---------------+--------------------+--------------------+--------------------+--------------------+\n",
+      "only showing top 10 rows\n",
+      "\n"
+     ]
+    }
+   ],
+   "source": [
+    "lyrics = spark.read.option(\"header\", \"true\").option(\"inferSchema\", \"true\")\\\n",
+    "    .csv(\"lyrics-data.csv\")\n",
+    "\n",
+    "lyrics.show(10)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 18,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "+------+--------------------+--------------------+\n",
+      "|Artist|               SName|               Lyric|\n",
+      "+------+--------------------+--------------------+\n",
+      "| AC/DC|       Back In Black|Back in black, I ...|\n",
+      "| AC/DC|     Highway To Hell|Living easy, livi...|\n",
+      "| AC/DC|       Thunderstruck|Ahh-ahh-ahh-ahh-a...|\n",
+      "| AC/DC|              T.N.T.|Aye, aye, aye, ay...|\n",
+      "| AC/DC|You Shook Me All ...|She was a fast ma...|\n",
+      "| AC/DC| Rock 'n' Roll Train|One hot angel. On...|\n",
+      "| AC/DC|     Shoot To Thrill|All you women who...|\n",
+      "| AC/DC|         Hells Bells|I'm a rolling thu...|\n",
+      "| AC/DC|It's A Long Way T...|Ridin' down the h...|\n",
+      "| AC/DC|Dirty Deeds, Done...|If you're havin' ...|\n",
+      "+------+--------------------+--------------------+\n",
+      "only showing top 10 rows\n",
+      "\n"
+     ]
+    }
+   ],
+   "source": [
+    "top_artist_songs = top_artists.join(lyrics, top_artists.Link == lyrics.ALink, \"inner\")\\\n",
+    "    .select(\"Artist\", \"SName\", \"Lyric\")\\\n",
+    "    \n",
+    "top_artist_songs.show(10)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {
+    "id": "DatBVcKUM8yn"
+   },
+   "source": [
+    "# 2 - Bonus \n",
+    "\n",
+    "\n",
+    "<p align=\"justify\">\n",
+    "<font size=\"3\">\n",
+    "Using the approach you prefer (just Dataframes, hybrid approach)  :\n",
+    "    \n",
+    "* the 10 most common words in the lyrics of each artist\n",
+    "* the 10 most common words for each genre. For this question we can use the primary genre of the artist.\n",
+    "\n",
+    "</font>\n",
+    "</p>\n",
+    "\n",
+    "\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 19,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "def split_words(text):\n",
+    "    \"\"\"\n",
+    "    Return words in the text whose length is at least 4.\n",
+    "    \n",
+    "    Parameters\n",
+    "    ----------\n",
+    "    text: str\n",
+    "        text to be split into words\n",
+    "    \n",
+    "    Returns\n",
+    "    -------\n",
+    "    list\n",
+    "        list of words whose length is at least 4.\n",
+    "\n",
+    "    \"\"\"\n",
+    "    text = text.lower()\n",
+    "    words = re.compile(r\"[.:;,\\s\\?!\\[\\]\\(\\)\\\"&\\*/]+\").split(text)\n",
+    "    words_without_stopwords = []\n",
+    "    for word in words:\n",
+    "        if len(word) > 3:\n",
+    "            words_without_stopwords.append(word)\n",
+    "    return words_without_stopwords"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "To answer the first question, I converted the merged Spark DataFrame to an RDD, split texts into words using the above function, created a merged list for each artist and, finally, arrived at the 10 most common words for each artist using the `Counter` data structure.\n",
+    "\n",
+    "To answer the second question, I used the results of the first question. Since each artist is unique in the `artists_unique` DataFrame, the main genre of the artist is also unique. Therefore, after generating top-10 words for each artist, I grouped results by the `Genre` to arrive at the most common words for each genre.\n",
+    "\n",
+    "**Note:** I did not remove stopwords in this exercise. I just removed words that contain 3 or fewer characters. (Most probably, they are stopwords.)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 20,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "                                                                                \r"
+     ]
+    },
+    {
+     "data": {
+      "text/plain": [
+       "[('10000 Maniacs',\n",
+       "  [('that', 222),\n",
+       "   ('your', 191),\n",
+       "   ('with', 153),\n",
+       "   ('from', 103),\n",
+       "   ('they', 96),\n",
+       "   ('know', 90),\n",
+       "   (\"don't\", 87),\n",
+       "   ('like', 80),\n",
+       "   ('love', 79),\n",
+       "   ('this', 78)]),\n",
+       " ('12 Stones',\n",
+       "  [('your', 311),\n",
+       "   ('this', 215),\n",
+       "   ('that', 215),\n",
+       "   ('away', 180),\n",
+       "   ('know', 170),\n",
+       "   ('again', 149),\n",
+       "   ('will', 148),\n",
+       "   (\"you're\", 137),\n",
+       "   ('time', 130),\n",
+       "   ('just', 127)]),\n",
+       " ('A Corte Animal',\n",
+       "  [('alguém', 21),\n",
+       "   ('peito', 15),\n",
+       "   ('nada', 14),\n",
+       "   ('como', 13),\n",
+       "   ('tudo', 12),\n",
+       "   ('flor', 12),\n",
+       "   ('brasília', 10),\n",
+       "   ('sempre', 9),\n",
+       "   ('novo', 9),\n",
+       "   ('aberto', 9)]),\n",
+       " ('A Day To Remember',\n",
+       "  [('this', 398),\n",
+       "   ('your', 333),\n",
+       "   ('that', 319),\n",
+       "   ('never', 243),\n",
+       "   ('what', 196),\n",
+       "   ('know', 195),\n",
+       "   (\"don't\", 186),\n",
+       "   ('when', 175),\n",
+       "   ('just', 175),\n",
+       "   (\"can't\", 174)]),\n",
+       " ('Abril',\n",
+       "  [('você', 351),\n",
+       "   ('tudo', 183),\n",
+       "   ('mais', 128),\n",
+       "   ('quero', 74),\n",
+       "   ('aonde', 64),\n",
+       "   ('agora', 58),\n",
+       "   ('quem', 56),\n",
+       "   ('nada', 55),\n",
+       "   ('quando', 55),\n",
+       "   ('dizer', 54)]),\n",
+       " ('Abuse',\n",
+       "  [('para', 27),\n",
+       "   ('mais', 19),\n",
+       "   ('você', 17),\n",
+       "   ('tudo', 14),\n",
+       "   ('vida', 12),\n",
+       "   ('entender', 11),\n",
+       "   ('isso', 9),\n",
+       "   ('mesmo', 8),\n",
+       "   ('nunca', 6),\n",
+       "   ('dizer', 6)]),\n",
+       " ('Agnela',\n",
+       "  [('você', 400),\n",
+       "   ('mais', 170),\n",
+       "   ('mamãe', 96),\n",
+       "   ('tempo', 80),\n",
+       "   ('quando', 80),\n",
+       "   ('quero', 78),\n",
+       "   ('assim', 76),\n",
+       "   ('tudo', 76),\n",
+       "   ('deixa', 62),\n",
+       "   ('mudar', 60)]),\n",
+       " ('Alanis Morissette',\n",
+       "  [('your', 568),\n",
+       "   ('this', 375),\n",
+       "   ('that', 372),\n",
+       "   ('with', 245),\n",
+       "   ('love', 239),\n",
+       "   ('have', 229),\n",
+       "   ('when', 198),\n",
+       "   (\"you're\", 198),\n",
+       "   ('what', 192),\n",
+       "   ('like', 185)]),\n",
+       " ('Alice Cooper',\n",
+       "  [('your', 826),\n",
+       "   ('that', 468),\n",
+       "   (\"don't\", 464),\n",
+       "   ('just', 394),\n",
+       "   ('like', 346),\n",
+       "   (\"you're\", 338),\n",
+       "   ('with', 338),\n",
+       "   ('what', 317),\n",
+       "   ('yeah', 308),\n",
+       "   (\"it's\", 306)]),\n",
+       " ('Am',\n",
+       "  [('what', 17),\n",
+       "   ('right', 17),\n",
+       "   ('away', 17),\n",
+       "   ('your', 16),\n",
+       "   ('that', 14),\n",
+       "   ('need', 12),\n",
+       "   ('know', 11),\n",
+       "   ('just', 10),\n",
+       "   ('turn', 9),\n",
+       "   ('into', 8)])]"
+      ]
+     },
+     "execution_count": 20,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "from collections import Counter\n",
+    "\n",
+    "joint_rdd = artists_unique.join(lyrics, artists_unique.Link == lyrics.ALink, \"inner\")\\\n",
+    "    .select(\"Artist\", \"Genre\", \"Lyric\").rdd\n",
+    "\n",
+    "artist_top_words = joint_rdd.map(lambda x: ((x[0], x[1]), x[2]))\\\n",
+    "    .mapValues(split_words)\\\n",
+    "    .reduceByKey(lambda x, y: x + y)\\\n",
+    "    .mapValues(lambda x: Counter(x).most_common(20))\n",
+    "\n",
+    "artist_top_words.map(lambda x: (x[0][0], x[1]))\\\n",
+    "    .mapValues(lambda x: x[:10])\\\n",
+    "    .take(10)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 21,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "                                                                                \r"
+     ]
+    },
+    {
+     "data": {
+      "text/plain": [
+       "[('Rock',\n",
+       "  [('minds', 620),\n",
+       "   ('simple', 619),\n",
+       "   ('lyrics', 606),\n",
+       "   ('coming', 342),\n",
+       "   ('with', 330),\n",
+       "   ('blondie', 306),\n",
+       "   ('make', 302),\n",
+       "   ('will', 293),\n",
+       "   ('nicht', 291),\n",
+       "   ('kimi', 275)]),\n",
+       " ('Samba',\n",
+       "  [('você', 579),\n",
+       "   ('quem', 345),\n",
+       "   ('malandro', 280),\n",
+       "   ('quando', 262),\n",
+       "   ('também', 257),\n",
+       "   ('mais', 250),\n",
+       "   ('porque', 227),\n",
+       "   ('está', 224),\n",
+       "   ('minha', 216),\n",
+       "   ('morro', 206)]),\n",
+       " ('Funk Carioca',\n",
+       "  [('créu', 566),\n",
+       "   ('pente', 302),\n",
+       "   ('creu', 300),\n",
+       "   ('dançar', 284),\n",
+       "   ('toma', 208),\n",
+       "   ('xana', 192),\n",
+       "   ('ioiô', 192),\n",
+       "   ('descendo', 182),\n",
+       "   ('então', 176),\n",
+       "   ('pica', 176)]),\n",
+       " ('Sertanejo',\n",
+       "  [(\"you're\", 170),\n",
+       "   ('para', 154),\n",
+       "   ('solidão', 146),\n",
+       "   ('bate', 136),\n",
+       "   ('leva', 129),\n",
+       "   ('saudade', 116),\n",
+       "   ('alguém', 116),\n",
+       "   ('preto', 114),\n",
+       "   ('luiz', 110),\n",
+       "   ('fonte', 109)]),\n",
+       " ('Pop',\n",
+       "  [('akon', 1072),\n",
+       "   ('nicki', 844),\n",
+       "   ('them', 760),\n",
+       "   ('halo', 684),\n",
+       "   ('whip', 652),\n",
+       "   ('hair', 514),\n",
+       "   ('shots', 510),\n",
+       "   ('whatcha', 432),\n",
+       "   ('gimme', 431),\n",
+       "   ('forth', 412)]),\n",
+       " ('Hip Hop',\n",
+       "  [('dogg', 1368),\n",
+       "   ('snoop', 1351),\n",
+       "   ('your', 937),\n",
+       "   ('soulja', 919),\n",
+       "   ('imma', 856),\n",
+       "   ('with', 689),\n",
+       "   ('gucci', 663),\n",
+       "   ('rock', 658),\n",
+       "   ('game', 627),\n",
+       "   ('eminem', 626)])]"
+      ]
+     },
+     "execution_count": 21,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "genre_top_words = artist_top_words.map(lambda x: (x[0][1], x[1]))\\\n",
+    "    .reduceByKey(lambda x, y: x + y)\\\n",
+    "    .mapValues(lambda pairs: Counter(dict(pairs)))\\\n",
+    "    .mapValues(lambda counts: counts.most_common(10))\n",
+    "\n",
+    "genre_top_words.collect()"
+   ]
+  }
+ ],
+ "metadata": {
+  "anaconda-cloud": {},
+  "colab": {
+   "name": "ass4-map-reduce-spark-colab.ipynb",
+   "provenance": [],
+   "toc_visible": true
+  },
+  "kernelspec": {
+   "display_name": "Python 3 (ipykernel)",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.8.12"
+  },
+  "name": "BE4-Spark.ipynb"
+ },
+ "nbformat": 4,
+ "nbformat_minor": 4
+}
